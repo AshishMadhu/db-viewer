@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && git push origin HEAD:deploy"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",
