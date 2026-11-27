@@ -18,14 +18,24 @@ const n = (v: unknown) => (v === null || v === undefined ? null : Number(v))
 export async function connectPostgres(cfg: PgConfig): Promise<Driver> {
   // The browser cannot open TCP sockets. The Vite dev/preview server exposes a same-origin
   // WebSocket->TCP relay (tools/pg-proxy.ts) and the driver tunnels the wire protocol through it.
-  neonConfig.useSecureWebSocket = location.protocol === 'https:'
-  neonConfig.pipelineConnect = false
-  neonConfig.pipelineTLS = false
-  neonConfig.forceDisablePgSSL = true // TLS (if any) is terminated by the relay, not in the browser
-  const tlsFlag = cfg.ssl === 'off' ? '0' : '1'
-  const verify = cfg.ssl === 'verify' ? '1' : '0'
-  neonConfig.wsProxy = (host, port) =>
-    `${location.host}/__pgproxy?host=${encodeURIComponent(host)}&port=${port}&tls=${tlsFlag}&verify=${verify}`
+  if (/\.neon\.(tech|build)$/i.test(cfg.host)) {
+    // Neon hosts expose their own WebSocket endpoint (wss://<host>/v2): no relay needed,
+    // so the hosted static build works. TLS is carried by the secure WebSocket.
+    neonConfig.useSecureWebSocket = true
+    neonConfig.forceDisablePgSSL = true
+    neonConfig.pipelineConnect = false
+    neonConfig.pipelineTLS = false
+    neonConfig.wsProxy = (host) => `${host}/v2`
+  } else {
+    neonConfig.useSecureWebSocket = location.protocol === 'https:'
+    neonConfig.pipelineConnect = false
+    neonConfig.pipelineTLS = false
+    neonConfig.forceDisablePgSSL = true // TLS (if any) is terminated by the relay, not in the browser
+    const tlsFlag = cfg.ssl === 'off' ? '0' : '1'
+    const verify = cfg.ssl === 'verify' ? '1' : '0'
+    neonConfig.wsProxy = (host, port) =>
+      `${location.host}/__pgproxy?host=${encodeURIComponent(host)}&port=${port}&tls=${tlsFlag}&verify=${verify}`
+  }
 
   const open = async () => {
     const c = new Client({
